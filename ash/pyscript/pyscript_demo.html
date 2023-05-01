@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plotly</title>
+  <link rel="stylesheet" href="https://pyscript.net/alpha/pyscript.css" />
+  <script defer src="https://pyscript.net/alpha/pyscript.js"></script>
+  <script defer src="../build/pyscript.js"></script>
+  <script defer src="https://cdn.plot.ly/plotly-2.10.1.min.js"></script>
+  <py-env>
+      - matplotlib
+      - pandas
+      - plotly
+  </py-env>
+</head>
+<body>
+  <script type='text/javascript'>
+      function plot(graph, chart) {
+          var figure = JSON.parse(graph)
+          Plotly.newPlot(chart, figure, {});
+      }
+  </script>
+  <div id="dendrogram"></div>
+  <py-script src="./pyscript_demo.py" output="dendrogram"></py-script>
+</body>
+</html>
