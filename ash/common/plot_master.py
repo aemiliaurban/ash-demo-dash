@@ -8,8 +8,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
 
-# DATA_FOLDER = os.path.join(os.getcwd(), "common", "user_data")
-DATA_FOLDER = os.path.join(os.getcwd(), "ash", "common", "user_data")
+DATA_FOLDER = os.path.join(os.getcwd(), "common", "user_data")
 
 REDUCED_DIMENSIONS_FOLDER = "reduced_dimensions"
 
