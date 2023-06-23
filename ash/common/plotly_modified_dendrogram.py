@@ -36,7 +36,6 @@ def create_dendrogram_modified(
         color_threshold=color_threshold,
         colorblind_palette=colorblind_palette,
     )
-
     return dendrogram
 
 
@@ -93,6 +92,9 @@ class _Dendrogram_Modified(object):
         self.clusters = clusters
         yvals_flat = yvals.flatten()
         xvals_flat = xvals.flatten()
+
+        self.xvals = xvals
+        self.yvals = yvals
 
         self.zero_vals = []
 
@@ -275,7 +277,7 @@ class _Dendrogram_Modified(object):
 
             trace_list.append(trace)
 
-        leaves_color_list_translated = {}
+        leaves_color_list_translated = OrderedDict()
         for i in range(len(P["leaves_color_list"])):
             leaves_color_list_translated[ordered_labels[i]] = colors[
                 P["leaves_color_list"][i]

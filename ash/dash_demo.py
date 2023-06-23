@@ -1,12 +1,15 @@
+import math
 from unittest.mock import patch
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 from cycler import cycler
 import plotly.graph_objects as go
 import dash_bootstrap_components as dbc
 from dash import Dash, Input, Output, dcc, html
 from plotly.graph_objs import graph_objs
+from scipy.cluster.hierarchy import fcluster
 
 from common.data_parser import RDataParser
 from common.plot_master import PlotMaster
@@ -45,6 +48,60 @@ def plot_input_data_reduced(plot_input_data: str, plot_master: PlotMaster):
         return plot_master.plot_pca()
 
 
+def extract_highest_x(data):
+    highest_x = float('-inf')  # Initialize with a very small value
+
+    for d in data:
+        x_values = d['x']
+        max_x = max(x_values)
+        if max_x > highest_x:
+            highest_x = max_x
+
+    return highest_x
+
+
+def assign_clusters(points):
+    clusters = []
+    current_cluster = []
+    prev_color = None
+
+    for point_id, color in points.items():
+        if prev_color is None or color != prev_color:
+            if current_cluster:
+                clusters.append(current_cluster)
+                current_cluster = []
+
+        current_cluster.append((point_id, color))
+        prev_color = color
+
+    if current_cluster:
+        clusters.append(current_cluster)
+
+    return clusters
+
+def convert_to_dict(clusters):
+    cluster_dict = {}
+    for i, cluster in enumerate(clusters):
+        point_ids = [point for point in cluster]
+        cluster_dict[str(i)] = point_ids
+    return cluster_dict
+
+def calculate_cluster_percentages(data):
+    total_length = 0
+
+    for lst in data.values():
+        total_length += len(lst)
+
+    cluster_counts = {}
+
+    cluster_percentages = {}
+    # Count the occurrences of each cluster
+    for i in range(len(list(data.values()))):
+        cluster_percentages[f"{i}"] = (len(list(data.values())[i]) / total_length) * 100
+
+    return cluster_percentages
+
+
 app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 app.layout = html.Div(
     [
@@ -64,6 +121,8 @@ app.layout = html.Div(
         ),
         dcc.Graph(id="dendrogram-graph", figure=go.Figure()),
         html.Div(id='no-of-clusters-output'),
+        html.Div(id="clusters"),
+        dcc.RadioItems(id="ClusterRadio", options=[], value=''),
         html.Header("Heatmap", style={"fontSize": 40, "margin-top": "25px"}),
         dcc.Dropdown(list(r.dataset.columns), multi=True, id="dropdown-heatmap-plot", value="All"),
         dcc.Graph(id="heatmap-graph", figure=go.Figure()),
@@ -113,12 +172,17 @@ def create_dendrogram(value, colorblind_palette_input):
             labels=r.labels,
             colorblind_palette=colorblind_palette,
         )
+        assigned_clusters = convert_to_dict(assign_clusters(custom_dendrogram.leaves_color_map_translated))
         to_return = {
             "leaves_color_map_translated": custom_dendrogram.leaves_color_map_translated,
             "clusters": custom_dendrogram.clusters,
             "labels": custom_dendrogram.labels,
             "data": custom_dendrogram.data,
             "layout": custom_dendrogram.layout,
+            "color_threshold": value,
+            "icoord": custom_dendrogram.xvals,
+            "dcoord": custom_dendrogram.yvals,
+            "assigned_clusters": assigned_clusters
         }
         return to_return
 
@@ -129,6 +193,14 @@ def create_dendrogram(value, colorblind_palette_input):
 )
 def plot_dendrogram(data):
     fig = graph_objs.Figure(data=data["data"], layout=data["layout"])
+    fig.add_shape(
+        type="line",
+        x0=0,
+        y0=data["color_threshold"],
+        x1=extract_highest_x(data["data"]),
+        y1=data["color_threshold"],
+        line=dict(color="red", width=2, dash="dash"),
+    )
     return fig
 
 
@@ -138,6 +210,31 @@ def plot_dendrogram(data):
 )
 def get_number_of_clusters(data):
     return f"Number of clusters: {data['clusters']}"
+
+
+@app.callback(
+    Output("clusters", "children"),
+    Input("dendrogram_memory", "data")
+)
+def get_cluster_percentages(data):
+    clusters = data["assigned_clusters"]
+    cluster_percentages = calculate_cluster_percentages(clusters)
+
+    return f"Individual cluster percentages: {cluster_percentages}"
+
+# Callback to update options
+@app.callback(
+    Output('ClusterRadio', 'options'),
+    Input("dendrogram_memory", "data")
+)
+def update_options(data):
+    options = []
+    for i in range(len(data["assigned_clusters"].keys())):
+        options.append({"label": html.Div([list(data["assigned_clusters"].keys())[i]],
+                                          style={'color': list(data["assigned_clusters"].items())[i][1][1][1],
+                                                 'font-size': 20}),
+                        "value": f"{i}"})
+    return options
 
 
 @app.callback(
