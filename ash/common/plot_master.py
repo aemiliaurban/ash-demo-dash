@@ -4,12 +4,11 @@ import numpy
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import streamlit
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
 
-#DATA_FOLDER = os.path.join(os.getcwd(), "common", "user_data")
+# DATA_FOLDER = os.path.join(os.getcwd(), "common", "user_data")
 DATA_FOLDER = os.path.join(os.getcwd(), "ash", "common", "user_data")
 
 REDUCED_DIMENSIONS_FOLDER = "reduced_dimensions"
@@ -26,28 +25,23 @@ class PlotMaster:
         self.order = order
         self.color_map = color_map
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def plot_interactive(self, data, layout):
         return go.Figure(data=data, layout=layout)
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def plot_dendrogram(self, dendrogram):
         return go.Figure(data=dendrogram.data, layout=dendrogram.layout)
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def plot_heatmap(self, desired_features):
         return go.Figure(
             data=go.Heatmap(self.df_to_plotly(self.input_data, desired_features))
         )
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def order_labels(self):
         ordered_labels = []
         for index in self.order:
             ordered_labels.append(self.labels[int(index)])
         return ordered_labels
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def df_to_plotly(
         self,
         df: pd.DataFrame,
@@ -57,7 +51,6 @@ class PlotMaster:
         df = df[desired_columns].T
         return {"z": df.values, "x": self.order_labels(), "y": df.index.tolist()}
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def plot_all_dimensions(self):
         features = self.input_data.columns
         fig = px.scatter_matrix(
@@ -70,7 +63,6 @@ class PlotMaster:
         fig.update_traces(diagonal_visible=True)
         return fig
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def plot_pca(self, dimensions: int = 2):
         filename = "pca.txt" if dimensions == 2 else "pca_3D.txt"
         pca = self.read_reduction(filename, REDUCED_DIMENSIONS_FOLDER)
@@ -101,7 +93,6 @@ class PlotMaster:
             )
         return fig
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def plot_tsne(self, dimensions: int = 2):
         filename = "tsne.txt" if dimensions == 2 else "tsne_3D.txt"
         tsne = self.read_reduction(filename, REDUCED_DIMENSIONS_FOLDER)
@@ -133,7 +124,6 @@ class PlotMaster:
             )
         return fig
 
-    @streamlit.cache(ttl=24 * 60 * 60)
     def plot_umap(self, dimensions: int = 2):
         filename = "umap.txt" if dimensions == 2 else "umap_3D.txt"
         umap = self.read_reduction(filename, REDUCED_DIMENSIONS_FOLDER)
@@ -164,25 +154,6 @@ class PlotMaster:
                 title="UMAP_3D",
             )
         return fig
-
-    def plot_selected_features_streamlit(self, col2):
-        desired_columns = col2.multiselect(
-            "Choose 2 features to plot.", self.input_data.columns
-        )
-        if len(desired_columns) != 2:
-            col2.write("Please choose 2 features to plot.")
-        else:
-            to_plot = self.input_data[desired_columns]
-            fig = px.scatter(
-                to_plot,
-                x=to_plot.columns[0],
-                y=to_plot.columns[1],
-                color=list(self.color_map.keys()),
-                color_discrete_map=self.color_map,
-                hover_name=self.labels,
-                labels={"color": "states"},
-            )
-            return fig
 
     def plot_selected_features(self, desired_columns):
         to_plot = self.input_data[desired_columns]

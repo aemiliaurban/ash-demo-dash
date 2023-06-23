@@ -12,7 +12,6 @@ commonmark==0.9.1
 contourpy==1.0.6
 cycler==0.11.0
 dash==2.7.0
-dash-bio==1.0.2
 dash-bootstrap-components
 dash-core-components==2.0.0
 dash-html-components==2.0.0
@@ -21,14 +20,12 @@ decorator==5.1.1
 entrypoints==0.4
 Flask==2.2.2
 fonttools==4.38.0
-GEOparse==2.0.3
 gitdb==4.0.10
 GitPython==3.1.29
 idna==3.4
 importlib-metadata==5.1.0
 isort==5.10.1
 itsdangerous==2.1.2
-Jinja2==3.1.2
 joblib==1.2.0
 jsonschema==4.17.3
 kiwisolver==1.4.4
@@ -41,8 +38,8 @@ numba==0.56.4
 numpy==1.23.5
 packaging==21.3
 pandas==1.5.2
-ParmEd==3.4.3
 pathspec==0.10.2
+ParmEd==4.1.0
 periodictable==1.6.1
 Pillow==9.3.0
 platformdirs==2.5.4

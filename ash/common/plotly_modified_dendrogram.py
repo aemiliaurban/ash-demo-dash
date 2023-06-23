@@ -2,9 +2,9 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
+from common.color_mappings import (COLORBLIND_PALETTE, NEW_OLD_COLORMAP,
+                                   NORMAL_COLOR_PALETTE, RGB_COLORSCALE)
 from plotly import optional_imports
-
-from common.color_mappings import RGB_COLORSCALE, NORMAL_COLOR_PALETTE, COLORBLIND_PALETTE, NEW_OLD_COLORMAP
 
 # Optional imports, may be None for users that only use our core functionality.
 np = optional_imports.get_module("numpy")
@@ -83,7 +83,7 @@ class _Dendrogram_Modified(object):
             ordered_labels,
             leaves,
             leaves_color_map_translated,
-            clusters
+            clusters,
         ) = self.get_dendrogram_traces(X, colorscale, hovertext, color_threshold)
 
         self.labels = ordered_labels
@@ -289,5 +289,5 @@ class _Dendrogram_Modified(object):
             ordered_labels,
             P["leaves"],
             leaves_color_list_translated,
-            clusters
+            clusters,
         )

@@ -10,7 +10,7 @@ NORMAL_COLOR_PALETTE = {
     "w": "gray",
     "o": "orange",
     "dg": "rgb(0, 128, 0)",
-#    "p": "rgb(153,076)"
+    #    "p": "rgb(153,076)"
 }
 
 COLORBLIND_PALETTE = [
@@ -26,13 +26,13 @@ COLORBLIND_PALETTE = [
 
 RGB_COLORSCALE = [
     "rgb(0,116,217)",  # blue
-    "rgb(0, 128, 0)", #dark green
+    "rgb(0, 128, 0)",  # dark green
     "rgb(35,205,205)",  # cyan
     "rgb(102,255,102)",  # green
     "rgb(40,35,35)",  # black
     "rgb(133,20,75)",  # magenta
     "rgb(255,65,54)",  # red
-    "rgb(255,128,0)", #orange
+    "rgb(255,128,0)",  # orange
     "rgb(160,160,160)",  # gray
     "rgb(255,220,0)",  # yellow
 ]
@@ -48,7 +48,7 @@ NEW_OLD_COLORMAP = [
     ("C7", "o"),
     ("C8", "dg"),
     ("C9", "w"),
-#    ("C10", "p")
+    #    ("C10", "p")
 ]
 
 RGB_50_SHADES = [
@@ -105,5 +105,5 @@ RGB_50_SHADES = [
     "rgb(128, 196, 64)",
     "rgb(64, 196, 128)",
     "rgb(64, 128, 196)",
-    "rgb(128, 64, 196)"
+    "rgb(128, 64, 196)",
 ]
