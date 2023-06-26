@@ -4,6 +4,9 @@ import dash_bootstrap_components as dbc
 import matplotlib
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+
+from ash.common.util import convert_to_dict, assign_clusters, extract_lowest_and_highest_x, \
+    create_point_position_dictionary, get_elements_from_list, plot_input_data_reduced, calculate_cluster_percentages
 from common.data_parser import RDataParser
 from common.plot_master import PlotMaster
 from common.plotly_modified_dendrogram import create_dendrogram_modified
@@ -14,105 +17,6 @@ matplotlib.pyplot.switch_backend("agg")
 r = RDataParser()
 r.convert_merge_matrix()
 r.add_joining_height()
-
-
-def plot_input_data_reduced(plot_input_data: str, plot_master: PlotMaster):
-    if plot_input_data == "All dimensions":
-        return plot_master.plot_all_dimensions()
-    elif plot_input_data == "PCA":
-        return plot_master.plot_pca()
-    elif "PCA_3D" in plot_input_data:
-        return plot_master.plot_pca(dimensions=3)
-    elif plot_input_data == "tSNE":
-        return plot_master.plot_tsne()
-    elif plot_input_data == "tSNE_3D":
-        return plot_master.plot_tsne(dimensions=3)
-    elif plot_input_data == "UMAP":
-        return plot_master.plot_umap()
-    elif plot_input_data == "UMAP_3D":
-        return plot_master.plot_umap(dimensions=3)
-    else:
-        return plot_master.plot_pca()
-
-
-def extract_highest_x(data):
-    highest_x = float("-inf")  # Initialize with a very small value
-
-    for d in data:
-        x_values = d["x"]
-        max_x = max(x_values)
-        if max_x > highest_x:
-            highest_x = max_x
-
-    return highest_x
-
-
-def extract_lowest_x(data):
-    lowest_x = float("inf")  # Initialize with a very small value
-
-    for d in data:
-        x_values = d["x"]
-        min_x = min(x_values)
-        if min_x > lowest_x:
-            lowest_x = min_x
-
-    return lowest_x
-
-
-def assign_clusters(points):
-    clusters = []
-    current_cluster = []
-    prev_color = None
-
-    for point_id, color in points.items():
-        if prev_color is None or color != prev_color:
-            if current_cluster:
-                clusters.append(current_cluster)
-                current_cluster = []
-
-        current_cluster.append((point_id, color))
-        prev_color = color
-
-    if current_cluster:
-        clusters.append(current_cluster)
-
-    return clusters
-
-
-def convert_to_dict(clusters):
-    cluster_dict = {}
-    for i, cluster in enumerate(clusters):
-        point_ids = [point for point in cluster]
-        cluster_dict[str(i)] = point_ids
-    return cluster_dict
-
-
-def calculate_cluster_percentages(data):
-    total_length = 0
-
-    for lst in data.values():
-        total_length += len(lst)
-
-    cluster_percentages = {}
-    # Count the occurrences of each cluster
-    for i in range(len(list(data.values()))):
-        cluster_percentages[f"{i}"] = (len(list(data.values())[i]) / total_length) * 100
-
-    return cluster_percentages
-
-
-def create_point_position_dictionary(lst: list[str]) -> dict[str, int]:
-    dictionary = {}
-    for index, item in enumerate(lst):
-        dictionary[item] = index
-    return dictionary
-
-
-def get_elements_from_list(lst, positions):
-    try:
-        return [lst[pos] for pos in positions]
-    except IndexError:
-        return []
 
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
@@ -145,6 +49,7 @@ app.layout = html.Div(
         ),
         dcc.Graph(id="heatmap-graph", figure=go.Figure()),
         html.Header("Two features plot", style={"fontSize": 40, "margin-top": "25px"}),
+        html.Div(id="error-message"),
         dcc.Dropdown(
             list(r.dataset.columns), multi=True, id="dropdown-selected-features-plot"
         ),
@@ -213,47 +118,52 @@ def create_dendrogram(value, colorblind_palette_input):
 )
 def plot_dendrogram(data, highlight_area):
     fig = graph_objs.Figure(data=data["data"], layout=data["layout"])
+    _, highest_x_data = extract_lowest_and_highest_x(data["data"])
     fig.add_shape(
         type="line",
         x0=0,
         y0=data["color_threshold"],
-        x1=extract_highest_x(data["data"]),
+        x1=highest_x_data,
         y1=data["color_threshold"],
         line=dict(color="red", width=2, dash="dash"),
     )
 
+    highlight_area_points = []
     if highlight_area:
         highlight_area_points_and_colors = data["assigned_clusters"][highlight_area]
         highlight_area_points = [
             point_color[0] for point_color in highlight_area_points_and_colors
         ]
         point_position_dictionary = create_point_position_dictionary(data["labels"])
-
         used_positions = {
             key: value
             for key, value in point_position_dictionary.items()
             if key in highlight_area_points
         }
-
         trimmed_data = get_elements_from_list(
-            data["data"], list(used_positions.values())
+            data["data"],
+            list(used_positions.values())[: len(list(used_positions.values())) - 1],
         )
+        lowest_x, highest_x = extract_lowest_and_highest_x(trimmed_data)
+        #
+        # fig.add_shape(
+        #     type="rect",
+        #     xref="x",
+        #     yref="paper",
+        #     x0=lowest_x,  # Use the start and end points of highlight area
+        #     y0=0,
+        #     x1=highest_x,
+        #     y1=1,
+        #     fillcolor="rgba(255,0,0,0.2)",  # Set the background color for the highlight area
+        #     layer="below",
+        #     line_width=0,
+        # )
+    for i, point in enumerate(fig.data):
+        point.hovertext = data["labels"][i]
 
-        lowest_x = extract_lowest_x(trimmed_data)
-        highest_x = extract_highest_x(trimmed_data)
-
-        fig.add_shape(
-            type="rect",
-            xref="x",
-            yref="paper",
-            x0=lowest_x,  # Use the start and end points of highlight area
-            y0=0,
-            x1=highest_x,
-            y1=1,
-            fillcolor="rgba(255,0,0,0.2)",  # Set the background color for the highlight area
-            layer="below",
-            line_width=0,
-        )
+        if highlight_area and data["labels"][i] in highlight_area_points:
+            point.fillcolor = "red"
+            point.marker.color = "red"
 
     return fig
 
@@ -319,20 +229,23 @@ def plot_heatmap(value, data):
 
 @app.callback(
     Output("two-features", "figure"),
+    Output("error-message", "children"),
     Input("dropdown-selected-features-plot", "value"),
     Input("dendrogram_memory", "data"),
 )
 def plot_two_selected_features(value, data):
-    plot_master = PlotMaster(
-        r.dataset, data["labels"], r.order, data["leaves_color_map_translated"]
-    )
     if type(value) != list or len(value) != 2:
-        feature_plot = go.Figure(
-            plot_master.plot_selected_features(r.dataset.columns[0:2])
-        )
+        # Return an empty figure if number of selected values is not two
+        feature_plot = go.Figure()
+        error_message = "Please select exactly two values."
     else:
-        feature_plot = go.Figure(plot_master.plot_selected_features(value))
-    return feature_plot
+        plot_master = PlotMaster(
+            r.dataset, data["labels"], r.order, data["leaves_color_map_translated"]
+        )
+        feature_plot = plot_master.plot_selected_features(value)
+        error_message = None
+
+    return feature_plot, error_message
 
 
 @app.callback(
