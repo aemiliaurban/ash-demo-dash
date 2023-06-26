@@ -1,55 +1,32 @@
 from unittest.mock import patch
 
+import dash_bootstrap_components as dbc
 import matplotlib
 import matplotlib.pyplot as plt
-from cycler import cycler
 import plotly.graph_objects as go
-import dash_bootstrap_components as dbc
-from dash import Dash, Input, Output, dcc, html
-from plotly.graph_objs import graph_objs
 
+from ash.common.util import convert_to_dict, assign_clusters, extract_lowest_and_highest_x, \
+    create_point_position_dictionary, get_elements_from_list, plot_input_data_reduced, calculate_cluster_percentages
 from common.data_parser import RDataParser
 from common.plot_master import PlotMaster
 from common.plotly_modified_dendrogram import create_dendrogram_modified
+from dash import Dash, Input, Output, dcc, html
+from plotly.graph_objs import graph_objs
 
 matplotlib.pyplot.switch_backend("agg")
-matplotlib.rcParams['axes.prop_cycle'] = matplotlib.cycler(color=["r", "k", "c"])
-
 r = RDataParser()
 r.convert_merge_matrix()
 r.add_joining_height()
-
-default_cycler = (cycler(color=['r', 'g', 'b', 'y']) +
-                  cycler(linestyle=['-', '--', ':', '-.']))
-
-plt.rc('lines', linewidth=4)
-plt.rc('axes', prop_cycle=default_cycler)
-
-
-def plot_input_data_reduced(plot_input_data: str, plot_master: PlotMaster):
-    if plot_input_data == "All dimensions":
-        return plot_master.plot_all_dimensions()
-    elif plot_input_data == "PCA":
-        return plot_master.plot_pca()
-    elif "PCA_3D" in plot_input_data:
-        return plot_master.plot_pca(dimensions=3)
-    elif plot_input_data == "tSNE":
-        return plot_master.plot_tsne()
-    elif plot_input_data == "tSNE_3D":
-        return plot_master.plot_tsne(dimensions=3)
-    elif plot_input_data == "UMAP":
-        return plot_master.plot_umap()
-    elif plot_input_data == "UMAP_3D":
-        return plot_master.plot_umap(dimensions=3)
-    else:
-        return plot_master.plot_pca()
 
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 app.layout = html.Div(
     [
         html.Header("Dendrogram", style={"fontSize": 40}),
-        html.H6("Choose color threshold for the dendrogram.", style={"fontSize": 25, "margin-top": "25px"}),
+        html.H6(
+            "Choose color threshold for the dendrogram.",
+            style={"fontSize": 25, "margin-top": "25px"},
+        ),
         dcc.Slider(
             min=0,
             max=r.max_tree_height,
@@ -63,11 +40,16 @@ app.layout = html.Div(
             id="colorblind-palette-dropdown",
         ),
         dcc.Graph(id="dendrogram-graph", figure=go.Figure()),
-        html.Div(id='no-of-clusters-output'),
+        html.Div(id="no-of-clusters-output"),
+        html.Div(id="clusters"),
+        dcc.RadioItems(id="ClusterRadio", options=[], value=""),
         html.Header("Heatmap", style={"fontSize": 40, "margin-top": "25px"}),
-        dcc.Dropdown(list(r.dataset.columns), multi=True, id="dropdown-heatmap-plot", value="All"),
+        dcc.Dropdown(
+            list(r.dataset.columns), multi=True, id="dropdown-heatmap-plot", value="All"
+        ),
         dcc.Graph(id="heatmap-graph", figure=go.Figure()),
         html.Header("Two features plot", style={"fontSize": 40, "margin-top": "25px"}),
+        html.Div(id="error-message"),
         dcc.Dropdown(
             list(r.dataset.columns), multi=True, id="dropdown-selected-features-plot"
         ),
@@ -113,31 +95,112 @@ def create_dendrogram(value, colorblind_palette_input):
             labels=r.labels,
             colorblind_palette=colorblind_palette,
         )
+        assigned_clusters = convert_to_dict(
+            assign_clusters(custom_dendrogram.leaves_color_map_translated)
+        )
         to_return = {
             "leaves_color_map_translated": custom_dendrogram.leaves_color_map_translated,
             "clusters": custom_dendrogram.clusters,
             "labels": custom_dendrogram.labels,
             "data": custom_dendrogram.data,
             "layout": custom_dendrogram.layout,
+            "color_threshold": value,
+            "icoord": custom_dendrogram.xvals,
+            "dcoord": custom_dendrogram.yvals,
+            "assigned_clusters": assigned_clusters,
         }
         return to_return
 
 
 @app.callback(
     Output("dendrogram-graph", "figure"),
-    Input("dendrogram_memory", "data"),
+    [Input("dendrogram_memory", "data"), Input("ClusterRadio", "value")],
 )
-def plot_dendrogram(data):
+def plot_dendrogram(data, highlight_area):
     fig = graph_objs.Figure(data=data["data"], layout=data["layout"])
+    _, highest_x_data = extract_lowest_and_highest_x(data["data"])
+    fig.add_shape(
+        type="line",
+        x0=0,
+        y0=data["color_threshold"],
+        x1=highest_x_data,
+        y1=data["color_threshold"],
+        line=dict(color="red", width=2, dash="dash"),
+    )
+
+    highlight_area_points = []
+    if highlight_area:
+        highlight_area_points_and_colors = data["assigned_clusters"][highlight_area]
+        highlight_area_points = [
+            point_color[0] for point_color in highlight_area_points_and_colors
+        ]
+        point_position_dictionary = create_point_position_dictionary(data["labels"])
+        used_positions = {
+            key: value
+            for key, value in point_position_dictionary.items()
+            if key in highlight_area_points
+        }
+        trimmed_data = get_elements_from_list(
+            data["data"],
+            list(used_positions.values())[: len(list(used_positions.values())) - 1],
+        )
+        lowest_x, highest_x = extract_lowest_and_highest_x(trimmed_data)
+        #
+        # fig.add_shape(
+        #     type="rect",
+        #     xref="x",
+        #     yref="paper",
+        #     x0=lowest_x,  # Use the start and end points of highlight area
+        #     y0=0,
+        #     x1=highest_x,
+        #     y1=1,
+        #     fillcolor="rgba(255,0,0,0.2)",  # Set the background color for the highlight area
+        #     layer="below",
+        #     line_width=0,
+        # )
+    for i, point in enumerate(fig.data):
+        point.hovertext = data["labels"][i]
+
+        if highlight_area and data["labels"][i] in highlight_area_points:
+            point.fillcolor = "red"
+            point.marker.color = "red"
+
     return fig
 
 
 @app.callback(
-    Output("no-of-clusters-output", "children"),
-    Input("dendrogram_memory", "data")
+    Output("no-of-clusters-output", "children"), Input("dendrogram_memory", "data")
 )
 def get_number_of_clusters(data):
     return f"Number of clusters: {data['clusters']}"
+
+
+@app.callback(Output("clusters", "children"), Input("dendrogram_memory", "data"))
+def get_cluster_percentages(data):
+    clusters = data["assigned_clusters"]
+    cluster_percentages = calculate_cluster_percentages(clusters)
+
+    return f"Individual cluster percentages: {cluster_percentages}"
+
+
+# Callback to update options
+@app.callback(Output("ClusterRadio", "options"), Input("dendrogram_memory", "data"))
+def update_options(data):
+    options = []
+    for i in range(len(data["assigned_clusters"].keys())):
+        options.append(
+            {
+                "label": html.Div(
+                    [list(data["assigned_clusters"].keys())[i]],
+                    style={
+                        "color": list(data["assigned_clusters"].items())[i][1][1][1],
+                        "font-size": 20,
+                    },
+                ),
+                "value": f"{i}",
+            }
+        )
+    return options
 
 
 @app.callback(
@@ -166,20 +229,23 @@ def plot_heatmap(value, data):
 
 @app.callback(
     Output("two-features", "figure"),
+    Output("error-message", "children"),
     Input("dropdown-selected-features-plot", "value"),
     Input("dendrogram_memory", "data"),
 )
 def plot_two_selected_features(value, data):
-    plot_master = PlotMaster(
-        r.dataset, data["labels"], r.order, data["leaves_color_map_translated"]
-    )
     if type(value) != list or len(value) != 2:
-        feature_plot = go.Figure(
-            plot_master.plot_selected_features(r.dataset.columns[0:2])
-        )
+        # Return an empty figure if number of selected values is not two
+        feature_plot = go.Figure()
+        error_message = "Please select exactly two values."
     else:
-        feature_plot = go.Figure(plot_master.plot_selected_features(value))
-    return feature_plot
+        plot_master = PlotMaster(
+            r.dataset, data["labels"], r.order, data["leaves_color_map_translated"]
+        )
+        feature_plot = plot_master.plot_selected_features(value)
+        error_message = None
+
+    return feature_plot, error_message
 
 
 @app.callback(

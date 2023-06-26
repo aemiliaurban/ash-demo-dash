@@ -2,9 +2,13 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
+from common.color_mappings import (
+    COLORBLIND_PALETTE,
+    NEW_OLD_COLORMAP,
+    NORMAL_COLOR_PALETTE,
+    RGB_COLORSCALE,
+)
 from plotly import optional_imports
-
-from common.color_mappings import RGB_COLORSCALE, NORMAL_COLOR_PALETTE, COLORBLIND_PALETTE, NEW_OLD_COLORMAP
 
 # Optional imports, may be None for users that only use our core functionality.
 np = optional_imports.get_module("numpy")
@@ -36,7 +40,6 @@ def create_dendrogram_modified(
         color_threshold=color_threshold,
         colorblind_palette=colorblind_palette,
     )
-
     return dendrogram
 
 
@@ -84,7 +87,7 @@ class _Dendrogram_Modified(object):
             ordered_labels,
             leaves,
             leaves_color_map_translated,
-            clusters
+            clusters,
         ) = self.get_dendrogram_traces(X, colorscale, hovertext, color_threshold)
 
         self.labels = ordered_labels
@@ -93,6 +96,9 @@ class _Dendrogram_Modified(object):
         self.clusters = clusters
         yvals_flat = yvals.flatten()
         xvals_flat = xvals.flatten()
+
+        self.xvals = xvals
+        self.yvals = yvals
 
         self.zero_vals = []
 
@@ -112,7 +118,6 @@ class _Dendrogram_Modified(object):
             )
             # Regenerating the leaves pos from the self.zero_vals with equally intervals.
             self.zero_vals = [v for v in correct_leaves_pos]
-
         self.zero_vals.sort()
         self.layout = self.set_figure_layout(width, height)
         self.data = dd_traces
@@ -225,7 +230,9 @@ class _Dendrogram_Modified(object):
             (e) P['leaves']: left-to-right traversal of the leaves
 
         """
-        P = sch.dendrogram(Z, color_threshold=color_threshold, no_labels=True)
+        P = sch.dendrogram(
+            Z, color_threshold=color_threshold, show_leaf_counts=True
+        )
         clusters = len(set(sch.fcluster(Z, color_threshold, criterion="distance")))
 
         icoord = scp.array(P["icoord"])
@@ -233,7 +240,6 @@ class _Dendrogram_Modified(object):
         ordered_labels = scp.array(P["ivl"])
         color_list = list(P["color_list"])
         colors = self.get_color_dict(colorscale)
-
         trace_list = []
         for i in range(len(icoord)):
             # xs and ys are arrays of 4 points that make up the '∩' shapes
@@ -275,11 +281,12 @@ class _Dendrogram_Modified(object):
 
             trace_list.append(trace)
 
-        leaves_color_list_translated = {}
+        leaves_color_list_translated = OrderedDict()
         for i in range(len(P["leaves_color_list"])):
             leaves_color_list_translated[ordered_labels[i]] = colors[
                 P["leaves_color_list"][i]
             ]
+
         return (
             trace_list,
             icoord,
@@ -287,5 +294,5 @@ class _Dendrogram_Modified(object):
             ordered_labels,
             P["leaves"],
             leaves_color_list_translated,
-            clusters
+            clusters,
         )
