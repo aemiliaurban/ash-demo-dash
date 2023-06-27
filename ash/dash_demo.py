@@ -3,6 +3,7 @@ from unittest.mock import patch
 import dash_bootstrap_components as dbc
 import matplotlib
 import matplotlib.pyplot as plt
+
 import numpy as np
 import plotly.graph_objects as go
 
@@ -14,6 +15,7 @@ from ash.common.util import (
     calculate_cluster_percentages,
     update_hover_template,
 )
+
 from common.data_parser import RDataParser
 from common.plot_master import PlotMaster
 from common.plotly_modified_dendrogram import create_dendrogram_modified
@@ -22,7 +24,9 @@ from plotly.graph_objs import graph_objs
 
 matplotlib.pyplot.switch_backend("agg")
 r = RDataParser()
+
 r.parse()
+
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 app.layout = html.Div(

@@ -231,6 +231,7 @@ class _Dendrogram_Modified(object):
 
         """
         P = sch.dendrogram(Z, color_threshold=color_threshold, show_leaf_counts=True)
+
         clusters = len(set(sch.fcluster(Z, color_threshold, criterion="distance")))
 
         icoord = scp.array(P["icoord"])
