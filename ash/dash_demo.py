@@ -3,10 +3,17 @@ from unittest.mock import patch
 import dash_bootstrap_components as dbc
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import plotly.graph_objects as go
 
-from ash.common.util import convert_to_dict, assign_clusters, extract_lowest_and_highest_x, \
-    create_point_position_dictionary, get_elements_from_list, plot_input_data_reduced, calculate_cluster_percentages
+from ash.common.util import (
+    convert_to_dict,
+    assign_clusters,
+    extract_lowest_and_highest_x,
+    plot_input_data_reduced,
+    calculate_cluster_percentages,
+    update_hover_template,
+)
 from common.data_parser import RDataParser
 from common.plot_master import PlotMaster
 from common.plotly_modified_dendrogram import create_dendrogram_modified
@@ -15,9 +22,7 @@ from plotly.graph_objs import graph_objs
 
 matplotlib.pyplot.switch_backend("agg")
 r = RDataParser()
-r.convert_merge_matrix()
-r.add_joining_height()
-
+r.parse()
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
 app.layout = html.Div(
@@ -44,6 +49,11 @@ app.layout = html.Div(
         html.Div(id="clusters"),
         dcc.RadioItems(id="ClusterRadio", options=[], value=""),
         html.Header("Heatmap", style={"fontSize": 40, "margin-top": "25px"}),
+        html.Div(
+            id="heatmap-message",
+            children=["Displaying a subset of the data due to constraints"],
+            style={"color": "black", "font-size": 20, "margin-bottom": "10px"},
+        ),
         dcc.Dropdown(
             list(r.dataset.columns), multi=True, id="dropdown-heatmap-plot", value="All"
         ),
@@ -134,34 +144,11 @@ def plot_dendrogram(data, highlight_area):
         highlight_area_points = [
             point_color[0] for point_color in highlight_area_points_and_colors
         ]
-        point_position_dictionary = create_point_position_dictionary(data["labels"])
-        used_positions = {
-            key: value
-            for key, value in point_position_dictionary.items()
-            if key in highlight_area_points
-        }
-        trimmed_data = get_elements_from_list(
-            data["data"],
-            list(used_positions.values())[: len(list(used_positions.values())) - 1],
-        )
-        lowest_x, highest_x = extract_lowest_and_highest_x(trimmed_data)
-        #
-        # fig.add_shape(
-        #     type="rect",
-        #     xref="x",
-        #     yref="paper",
-        #     x0=lowest_x,  # Use the start and end points of highlight area
-        #     y0=0,
-        #     x1=highest_x,
-        #     y1=1,
-        #     fillcolor="rgba(255,0,0,0.2)",  # Set the background color for the highlight area
-        #     layer="below",
-        #     line_width=0,
-        # )
+
     for i, point in enumerate(fig.data):
         point.hovertext = data["labels"][i]
 
-        if highlight_area and data["labels"][i] in highlight_area_points:
+        if data["labels"][i] in highlight_area_points:
             point.fillcolor = "red"
             point.marker.color = "red"
 
@@ -232,10 +219,10 @@ def plot_heatmap(value, data):
     Output("error-message", "children"),
     Input("dropdown-selected-features-plot", "value"),
     Input("dendrogram_memory", "data"),
+    Input("ClusterRadio", "value"),
 )
-def plot_two_selected_features(value, data):
+def plot_two_selected_features(value, data, highlight_area):
     if type(value) != list or len(value) != 2:
-        # Return an empty figure if number of selected values is not two
         feature_plot = go.Figure()
         error_message = "Please select exactly two values."
     else:
@@ -244,6 +231,19 @@ def plot_two_selected_features(value, data):
         )
         feature_plot = plot_master.plot_selected_features(value)
         error_message = None
+
+        if highlight_area:
+            highlight_area_points_and_colors = data["assigned_clusters"].get(
+                highlight_area
+            )
+            if highlight_area_points_and_colors:
+                highlight_area_points = [
+                    point_color[0] for point_color in highlight_area_points_and_colors
+                ]
+                for i, point in enumerate(feature_plot.data):
+                    for highlight in highlight_area_points:
+                        if point.hovertext == np.array(str(highlight)):
+                            plot_master.update_marker_color(feature_plot, i, "red")
 
     return feature_plot, error_message
 

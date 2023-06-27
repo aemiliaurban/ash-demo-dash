@@ -148,3 +148,22 @@ def get_elements_from_list(lst, positions):
         return marked_positions
     except IndexError:
         return []
+
+
+def update_hover_template(hover_template, selected_points, highlight_area_points):
+    updated_hover_template = hover_template
+
+    if any(selected_points):
+        selected_indices = [
+            str(i) for i, selected in enumerate(selected_points) if selected
+        ]
+        selected_indices_str = ", ".join(selected_indices)
+        highlight_area_str = ", ".join(highlight_area_points)
+        updated_hover_template += (
+            "<br><b>Selected Indices:</b> "
+            + selected_indices_str
+            + "<br><b>Highlight Area:</b> "
+            + highlight_area_str
+        )
+
+    return updated_hover_template
