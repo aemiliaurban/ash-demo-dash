@@ -98,3 +98,7 @@ class RDataParser:
         for step in range(len(self.joining_height)):
             height_marks[self.joining_height[step]] = f"Formed cluster {str(step+1)}"
         return height_marks
+
+    def parse(self):
+        self.convert_merge_matrix()
+        self.add_joining_height()

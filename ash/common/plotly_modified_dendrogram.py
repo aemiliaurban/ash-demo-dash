@@ -230,9 +230,8 @@ class _Dendrogram_Modified(object):
             (e) P['leaves']: left-to-right traversal of the leaves
 
         """
-        P = sch.dendrogram(
-            Z, color_threshold=color_threshold, show_leaf_counts=True
-        )
+        P = sch.dendrogram(Z, color_threshold=color_threshold, show_leaf_counts=True)
+
         clusters = len(set(sch.fcluster(Z, color_threshold, criterion="distance")))
 
         icoord = scp.array(P["icoord"])

@@ -163,8 +163,9 @@ class PlotMaster:
             color=list(self.color_map.keys()),
             color_discrete_map=self.color_map,
             hover_name=self.labels,
-            labels={"color": "states"},
+            labels={"color": "sample"},
         )
+        fig.update_layout(showlegend=False)
         return fig
 
     @staticmethod
@@ -192,3 +193,13 @@ class PlotMaster:
         except:
             return None
         return data
+
+    @staticmethod
+    def update_marker_color(fig, trace_index, new_color):
+        trace = fig.data
+        print(trace)
+        trace.marker.color = new_color
+        print(trace)
+        fig.data[trace_index] = trace
+
+        return fig
