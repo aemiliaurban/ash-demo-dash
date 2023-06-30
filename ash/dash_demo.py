@@ -1,26 +1,19 @@
+import copy
 from unittest.mock import patch
 
 import dash_bootstrap_components as dbc
 import matplotlib
 import matplotlib.pyplot as plt
-
-import numpy as np
 import plotly.graph_objects as go
-
-from ash.common.util import (
-    convert_to_dict,
-    assign_clusters,
-    extract_lowest_and_highest_x,
-    plot_input_data_reduced,
-    calculate_cluster_percentages,
-    update_hover_template,
-)
-
 from common.data_parser import RDataParser
 from common.plot_master import PlotMaster
 from common.plotly_modified_dendrogram import create_dendrogram_modified
 from dash import Dash, Input, Output, dcc, html
 from plotly.graph_objs import graph_objs
+
+from ash.common.util import (assign_clusters, calculate_cluster_percentages,
+                             convert_to_dict, extract_lowest_and_highest_x,
+                             plot_input_data_reduced)
 
 matplotlib.pyplot.switch_backend("agg")
 r = RDataParser()
@@ -71,6 +64,7 @@ app.layout = html.Div(
         html.Header(
             "Dimension reduction plot", style={"fontSize": 40, "margin-top": "25px"}
         ),
+        html.Div(id="error-message-dim-red"),
         dcc.Dropdown(
             [
                 "All dimensions",
@@ -82,7 +76,7 @@ app.layout = html.Div(
                 "UMAP_3D",
             ],
             id="plot_dropdown",
-            value=["PCA"],
+            value=None,
         ),
         dcc.Graph(id="reduced-graph", figure=go.Figure()),
         dcc.Store(id="dendrogram_memory"),
@@ -230,38 +224,51 @@ def plot_two_selected_features(value, data, highlight_area):
         feature_plot = go.Figure()
         error_message = "Please select exactly two values."
     else:
-        plot_master = PlotMaster(
-            r.dataset, data["labels"], r.order, data["leaves_color_map_translated"]
-        )
+        color_map = copy.deepcopy(data["leaves_color_map_translated"])
+        if highlight_area:
+            highlight_area_points_and_colors = data["assigned_clusters"][highlight_area]
+            highlight_area_points = [
+                point_color[0] for point_color in highlight_area_points_and_colors
+            ]
+            for point in highlight_area_points:
+                color_map[point] = "red"
+        plot_master = PlotMaster(r.dataset, data["labels"], r.order, color_map)
         feature_plot = plot_master.plot_selected_features(value)
         error_message = None
-
-        if highlight_area:
-            highlight_area_points_and_colors = data["assigned_clusters"].get(
-                highlight_area
-            )
-            if highlight_area_points_and_colors:
-                highlight_area_points = [
-                    point_color[0] for point_color in highlight_area_points_and_colors
-                ]
-                for i, point in enumerate(feature_plot.data):
-                    for highlight in highlight_area_points:
-                        if point.hovertext == np.array(str(highlight)):
-                            plot_master.update_marker_color(feature_plot, i, "red")
-
     return feature_plot, error_message
 
 
 @app.callback(
     Output("reduced-graph", "figure"),
+    Output("error-message-dim-red", "children"),
     Input("plot_dropdown", "value"),
     Input("dendrogram_memory", "data"),
+    Input("ClusterRadio", "value"),
 )
-def plot_data_reduced(value, data):
-    plot_master = PlotMaster(
-        r.dataset, data["labels"], r.order, data["leaves_color_map_translated"]
-    )
-    return plot_input_data_reduced(value, plot_master)
+def plot_data_reduced(value, data, highlight_area):
+    if value is None:
+        reduced_plot = go.Figure()
+        error_message = "Please select dimensionality reduction.\n " \
+                        "Ash will attempt to access pre-calculated dimensionality reduction data at the designated location (ash/common/user_data/reduced_dimensions)." \
+                        "If the data is not found, " \
+                        "Ash will perform the necessary calculations on the matrix data provided at the designated location (ash/common/user_data/data.csv), " \
+                        "which may result in longer processing time."
+    else:
+        color_map = copy.deepcopy(data["leaves_color_map_translated"])
+        if highlight_area:
+            highlight_area_points_and_colors = data["assigned_clusters"][highlight_area]
+            highlight_area_points = [
+                point_color[0] for point_color in highlight_area_points_and_colors
+            ]
+            for point in highlight_area_points:
+                color_map[point] = "red"
+        plot_master = PlotMaster(
+            r.dataset, data["labels"], r.order, color_map
+        )
+        reduced_plot = plot_input_data_reduced(value, plot_master)
+        error_message = None
+
+    return reduced_plot, error_message
 
 
 if __name__ == "__main__":
