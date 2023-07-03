@@ -197,9 +197,7 @@ class PlotMaster:
     @staticmethod
     def update_marker_color(fig, trace_index, new_color):
         trace = fig.data
-        print(trace)
         trace.marker.color = new_color
-        print(trace)
         fig.data[trace_index] = trace
 
         return fig
