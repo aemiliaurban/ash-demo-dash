@@ -70,6 +70,9 @@ class PlotMaster:
             self.save_reduction(pca, filename, REDUCED_DIMENSIONS_FOLDER)
 
         if dimensions == 2:
+            print("===========")
+            print(len(pca))
+            print("===========")
             fig = px.scatter(
                 pca,
                 x=0,

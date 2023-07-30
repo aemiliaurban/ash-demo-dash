@@ -2,8 +2,12 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from common.color_mappings import (COLORBLIND_PALETTE, NEW_OLD_COLORMAP,
-                                   NORMAL_COLOR_PALETTE, RGB_COLORSCALE)
+from common.color_mappings import (
+    COLORBLIND_PALETTE,
+    NEW_OLD_COLORMAP,
+    NORMAL_COLOR_PALETTE,
+    RGB_COLORSCALE,
+)
 from plotly import optional_imports
 
 # Optional imports, may be None for users that only use our core functionality.
@@ -77,6 +81,7 @@ class _Dendrogram_Modified(object):
             self.sign[self.yaxis] = -1
 
         (
+            dendro,
             dd_traces,
             xvals,
             yvals,
@@ -95,6 +100,8 @@ class _Dendrogram_Modified(object):
 
         self.xvals = xvals
         self.yvals = yvals
+
+        self.dendro = dendro
 
         self.zero_vals = []
 
@@ -283,6 +290,7 @@ class _Dendrogram_Modified(object):
             ]
 
         return (
+            P,
             trace_list,
             icoord,
             dcoord,

@@ -1,3 +1,17 @@
+C_TO_NAME_COLORMAP = [
+    ("C0", "blue"),
+    ("C1", "green"),
+    ("C2", "red"),
+    ("C3", "cyan"),
+    ("C4", "magenta"),
+    ("C5", "yellow"),
+    ("C6", "black"),
+    ("C7", "orange"),
+    ("C8", "rgb(0, 128, 0)"),
+    ("C9", "gray"),
+    #    ("C10", "p")
+]
+
 NORMAL_COLOR_PALETTE = {
     "r": "red",
     "g": "green",

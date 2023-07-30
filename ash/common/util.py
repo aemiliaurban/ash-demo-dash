@@ -1,3 +1,6 @@
+import ast
+import re
+
 from ash.common.plot_master import PlotMaster
 
 
@@ -148,3 +151,55 @@ def get_elements_from_list(lst, positions):
         return marked_positions
     except IndexError:
         return []
+
+
+def modify_dendrogram_color(dendrogram, xmin, xmax, ymin, ymax, color):
+    for i in range(len(dendrogram["icoord"])):
+        if (
+            xmin <= dendrogram["icoord"][i][0] <= xmax
+            or xmin <= dendrogram["icoord"][i][2] <= xmax
+        ) and (ymin <= dendrogram["dcoord"][i][1] <= ymax):
+            dendrogram["color_list"][i] = color
+            dendrogram["leaves_color_list"][i] = color
+
+
+def write_to_text_file(filename, content):
+    try:
+        with open(filename, "w") as file:
+            file.write(f"{content}")
+        print(f"Content successfully written to {filename}")
+    except IOError as e:
+        print(f"Error writing to {filename}: {str(e)}")
+
+
+def read_text_file(filename):
+    try:
+        with open(filename, "r") as file:
+            content = file.read()
+        print(f"Content successfully read from {filename}")
+        return eval(content)
+    except IOError as e:
+        print(f"Error reading from {filename}: {str(e)}")
+        return {}
+
+
+def replace_color_values(dendrogram, color_map):
+    for i, color in enumerate(dendrogram["color_list"]):
+        for old_color, new_color in color_map:
+            if color == old_color:
+                dendrogram["color_list"][i] = new_color
+                break
+    return dendrogram
+
+
+def get_click_coordinates(trace, points, selector):
+    if points.point_inds:
+        x = points.xs[0]
+        y = points.ys[0]
+        print(f"Clicked on point at (x={x}, y={y})")
+
+
+def parse_value_string(value_string):
+    list_string = re.search(r"\[(.*?)\]", value_string).group(1)
+    value_list = ast.literal_eval(list_string)
+    return value_list
