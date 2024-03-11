@@ -4,6 +4,7 @@ import os
 import pandas as pd
 
 DATA_FOLDER = os.path.join(os.getcwd(), "common", "user_data")
+#DATA_FOLDER = "/app/ash/common/user_data"
 
 
 def csv_order_data_reader(path: str):
@@ -69,7 +70,7 @@ class RDataParser:
     def read_labels(self):
         try:
             labels = pd.read_csv(os.path.join(DATA_FOLDER, "labels.csv"))
-        except:
+        except FileNotFoundError:
             labels = [i for i in range(len(self.order))]
         return labels
 

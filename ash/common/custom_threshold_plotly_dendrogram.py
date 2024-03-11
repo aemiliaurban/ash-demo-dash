@@ -2,44 +2,95 @@ from __future__ import absolute_import
 
 from collections import OrderedDict
 
-from common.color_mappings import (COLORBLIND_PALETTE, NEW_OLD_COLORMAP,
-                                   NORMAL_COLOR_PALETTE, RGB_COLORSCALE)
-from plotly import optional_imports
+import numpy as np
+import scipy
+from common.color_mappings import (
+    COLORBLIND_PALETTE,
+    KELLY_MAX_CONTRAST_PALETTE,
+)
+from common.util import indexable_cycle
 
-# Optional imports, may be None for users that only use our core functionality.
-np = optional_imports.get_module("numpy")
-scp = optional_imports.get_module("scipy")
-sch = optional_imports.get_module("scipy.cluster.hierarchy")
-scs = optional_imports.get_module("scipy.spatial")
+
+def split_dendrogram(linkage_matrix, monocrit, palette):
+    """
+    The function create scipy dendrogram object, so that
+    link colors matches monocrit split criteria
+    """
+    dflt_col = "#808080"
+    # 1 get clusters
+    cluster_indices = scipy.cluster.hierarchy.fcluster(
+        linkage_matrix, 0, criterion="monocrit", monocrit=monocrit
+    )
+    # 2 create color map
+    color_map = {
+        cluster: indexable_cycle(palette, cluster) for cluster in set(cluster_indices)
+    }
+    point_color_map = {}
+    for nr, p in enumerate(cluster_indices):
+        point_color_map[nr] = color_map[p]
+    # 3 apply color map
+    link_cols = {}
+    for i, i12 in enumerate(linkage_matrix[:, :2].astype(int)):
+        c1, c2 = (
+            link_cols[x] if x > len(linkage_matrix) else point_color_map[x] for x in i12
+        )
+        link_cols[i + 1 + len(linkage_matrix)] = c1 if c1 == c2 else dflt_col
+    return (
+        scipy.cluster.hierarchy.dendrogram(
+            Z=linkage_matrix, link_color_func=lambda x: link_cols[x]
+        ),
+        cluster_indices,
+        # numpy int is not serializable, therefore color_map cannot be simpy returned
+        {int(k): v for k, v in color_map.items()},
+    )
+
+
+def sort_dendrogram(dendrogram):
+    def sorting_key(i):
+        return max(i[2])
+
+    s = sorted(
+        zip(
+            dendrogram["color_list"],
+            dendrogram["icoord"],
+            dendrogram["dcoord"],
+            dendrogram["ivl"],
+            dendrogram["leaves"],
+            dendrogram["leaves_color_list"],
+        ),
+        key=sorting_key,
+    )
+
+    return {
+        "color_list": [i[0] for i in s],
+        "icoord": [i[1] for i in s],
+        "dcoord": [i[2] for i in s],
+        "ivl": [i[3] for i in s],
+        "leaves": [i[4] for i in s],
+        "leaves_color_list": [i[5] for i in s],
+    }
 
 
 def create_dendrogram_modified(
     Z,
     orientation="bottom",
     labels=None,
-    colorscale=None,
     hovertext=None,
-    color_threshold=None,
     colorblind_palette=False,
+    monocrit_list=[],
 ):
-    if not scp or not scs or not sch:
-        raise ImportError(
-            "FigureFactory.create_dendrogram requires scipy, \
-                            scipy.spatial and scipy.hierarchy"
-        )
     dendrogram = _Dendrogram_Modified(
         Z,
         orientation,
         labels,
-        colorscale,
         hovertext=hovertext,
-        color_threshold=color_threshold,
         colorblind_palette=colorblind_palette,
+        monocrit_list=monocrit_list,
     )
     return dendrogram
 
 
-class _Dendrogram_Modified(object):
+class _Dendrogram_Modified:
     """Refer to FigureFactory.create_dendrogram() for docstring."""
 
     def __init__(
@@ -47,17 +98,14 @@ class _Dendrogram_Modified(object):
         X,
         orientation="bottom",
         labels=None,
-        colorscale=None,
-        width=np.inf,
-        height=np.inf,
         xaxis="xaxis",
         yaxis="yaxis",
         hovertext=None,
-        color_threshold=None,
         colorblind_palette=False,
+        monocrit_list=[],
     ):
-        self.orientation = "bottom"
-        self.labels = None
+        self.orientation = orientation
+        self.labels = labels
         self.xaxis = xaxis
         self.yaxis = yaxis
         self.data = []
@@ -65,6 +113,11 @@ class _Dendrogram_Modified(object):
         self.sign = {self.xaxis: 1, self.yaxis: 1}
         self.layout = {self.xaxis: {}, self.yaxis: {}}
         self.colorblind_palette = colorblind_palette
+        if self.colorblind_palette:
+            self.palette = COLORBLIND_PALETTE
+        else:
+            self.palette = KELLY_MAX_CONTRAST_PALETTE
+        self.monocrit_list = monocrit_list
 
         if self.orientation in ["left", "bottom"]:
             self.sign[self.xaxis] = 1
@@ -77,6 +130,7 @@ class _Dendrogram_Modified(object):
             self.sign[self.yaxis] = -1
 
         (
+            dendro,
             dd_traces,
             xvals,
             yvals,
@@ -84,7 +138,7 @@ class _Dendrogram_Modified(object):
             leaves,
             leaves_color_map_translated,
             clusters,
-        ) = self.get_dendrogram_traces(X, colorscale, hovertext, color_threshold)
+        ) = self.get_dendrogram_traces(X, hovertext)
 
         self.labels = ordered_labels
         self.leaves = leaves
@@ -95,6 +149,8 @@ class _Dendrogram_Modified(object):
 
         self.xvals = xvals
         self.yvals = yvals
+
+        self.dendro = dendro
 
         self.zero_vals = []
 
@@ -115,43 +171,8 @@ class _Dendrogram_Modified(object):
             # Regenerating the leaves pos from the self.zero_vals with equally intervals.
             self.zero_vals = [v for v in correct_leaves_pos]
         self.zero_vals.sort()
-        self.layout = self.set_figure_layout(width, height)
+        self.layout = self.set_figure_layout()
         self.data = dd_traces
-
-    def get_color_dict(self, colorscale):
-        """
-        Returns colorscale used for dendrogram tree clusters.
-        :param (list) colorscale: Colors to use for the plot in rgb format.
-        :rtype (dict): A dict of default colors mapped to the user colorscale.
-        """
-        if self.colorblind_palette:
-            # e.g., the palette from colorbrewer2.org
-            default_colors = OrderedDict(COLORBLIND_PALETTE)
-        else:
-            default_colors = OrderedDict(
-                sorted(NORMAL_COLOR_PALETTE.items(), key=lambda t: t[0])
-            )
-
-        if colorscale is None:
-            rgb_colorscale = RGB_COLORSCALE
-        else:
-            rgb_colorscale = colorscale
-
-        for i in range(len(default_colors.keys())):
-            k = list(default_colors.keys())[i]  # PY3 won't index keys
-            if i < len(rgb_colorscale):
-                default_colors[k] = rgb_colorscale[i]
-
-        for nc, oc in NEW_OLD_COLORMAP:
-            try:
-                default_colors[nc] = default_colors[oc]
-            except KeyError:
-                # it could happen that the old color isn't found (if a custom
-                # colorscale was specified), in this case we set it to an
-                # arbitrary default.
-                default_colors[nc] = "rgb(0,116,217)"
-
-        return default_colors
 
     def set_axis_layout(self, axis_key):
         """
@@ -187,26 +208,24 @@ class _Dendrogram_Modified(object):
 
         return self.layout[axis_key]
 
-    def set_figure_layout(self, width, height):
+    def set_figure_layout(self):
         """
         Sets and returns default layout object for dendrogram figure.
         """
         self.layout.update(
             {
                 "showlegend": False,
-                "autosize": False,
+                "autosize": True,
                 "hovermode": "closest",
-                "width": width,
-                "height": height,
+                "xaxis_title": "Observations",
+                "yaxis_title": "Height",
+                "xaxis_showticklabels": False,
             }
         )
 
-        # self.set_axis_layout(self.xaxis)
-        # self.set_axis_layout(self.yaxis)
-
         return self.layout
 
-    def get_dendrogram_traces(self, Z, colorscale, hovertext, color_threshold):
+    def get_dendrogram_traces(self, Z, hovertext):
         """
         Calculates all the elements needed for plotting a dendrogram.
 
@@ -226,15 +245,28 @@ class _Dendrogram_Modified(object):
             (e) P['leaves']: left-to-right traversal of the leaves
 
         """
-        P = sch.dendrogram(Z, color_threshold=color_threshold, show_leaf_counts=True)
+        # TODO: Z neni linkage matrix ale list of ...
+        Z = np.asarray(Z)
+        cut_points = np.zeros((Z.shape[0],))
+        inverted_monocrit = [-i for i in self.monocrit_list]
+        cut_points[inverted_monocrit] = 1
 
-        clusters = len(set(sch.fcluster(Z, color_threshold, criterion="distance")))
+        # We need to sort links in order to color them properly
+        dendrogram, cluster_indices, color_map = split_dendrogram(
+            Z, cut_points, self.palette
+        )
+        self.cluster_indices = cluster_indices
+        self.color_map = color_map
+        P = sort_dendrogram(dendrogram)
+        # that is simply an integer that denotes number of clusters
+        clusters = len(set(cluster_indices))
+        # icoord is list of x coordinates for each '∩' shape - that is 4 values, because '∩' has for vertices
+        icoord = scipy.array(P["icoord"])
+        # dcoord is list of y coordinates for each '∩' shape - that is 4 values, because '∩' has for vertices
+        dcoord = scipy.array(P["dcoord"])
 
-        icoord = scp.array(P["icoord"])
-        dcoord = scp.array(P["dcoord"])
-        ordered_labels = scp.array(P["ivl"])
+        ordered_labels = scipy.array(P["ivl"])
         color_list = list(P["color_list"])
-        colors = self.get_color_dict(colorscale)
         trace_list = []
         for i in range(len(icoord)):
             # xs and ys are arrays of 4 points that make up the '∩' shapes
@@ -248,7 +280,7 @@ class _Dendrogram_Modified(object):
                 ys = dcoord[i]
             else:
                 ys = icoord[i]
-            color_key = color_list[i]
+
             hovertext_label = None
             if hovertext:
                 hovertext_label = hovertext[i]
@@ -257,9 +289,8 @@ class _Dendrogram_Modified(object):
                 x=np.multiply(self.sign[self.xaxis], xs),
                 y=np.multiply(self.sign[self.yaxis], ys),
                 mode="lines",
-                marker=dict(color=colors[color_key]),
-                text=hovertext_label,
-                hoverinfo="text",
+                marker=dict(color=P["color_list"][i]),
+                hoverinfo="skip",
             )
             try:
                 x_index = int(self.xaxis[-1])
@@ -275,14 +306,35 @@ class _Dendrogram_Modified(object):
             trace["yaxis"] = "y" + y_index
 
             trace_list.append(trace)
+            # append midpoint labels
+            # ["blue" if (len(icoord) - j) in self.monocrit_list not in self.monocrit_list else P["color_list"][i]  for j in range(len(icoord))]
+            # print(self.monocrit_list)
+            # marker size
+            markers = dict(color=P["color_list"][i])
+            if (len(icoord) - i) in self.monocrit_list:
+                markers = dict(color="red", size=15, symbol="x")
+            trace_list.append(
+                dict(
+                    type="scatter",
+                    x=[(xs[1] + xs[2]) / 2],
+                    y=[(ys[1] + ys[2]) / 2],
+                    mode="markers",
+                    marker=markers,
+                    text=hovertext_label,
+                    hoverinfo="text",
+                    hovertext=[f"Node {len(icoord) - i}"],
+                )
+            )
 
         leaves_color_list_translated = OrderedDict()
-        for i in range(len(P["leaves_color_list"])):
-            leaves_color_list_translated[ordered_labels[i]] = colors[
-                P["leaves_color_list"][i]
-            ]
+
+        # for i in range(len(P["leaves_color_list"])):
+        #     leaves_color_list_translated[ordered_labels[i]] = colors[  # TODO: tady failujeme, potrebujeme to vubec?
+        #         P["leaves_color_list"][i]
+        #     ]
 
         return (
+            P,
             trace_list,
             icoord,
             dcoord,

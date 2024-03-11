@@ -1,12 +1,37 @@
 # Ash
 
-##Docker
-From ash-demo-dash repo:
-docker build -f Dockerfile . -t dash-demo 
-docker run dash-demo
+## How to run Ash via Docker
+Commands ought to be run from the root of the repo. Alternatively, you can adjust the paths.
 
-##Local
-How to run:   
-Ash requires Python 3.10 or higher to work properly.   
-Requirements can be installed by using the ```pip install -r /path/to/requirements.txt``` command.  
-Start the application in the terminal by the ```python ash/dash_demo.py``` command.
+### Build the image:
+```
+docker build . -t ash --no-cache 
+```
+### Run the container:
+```
+docker run -p 8050:8050 ash 
+```
+
+## How to run Ash locally from the source
+Ash supports python3.10. Make sure you have it installed on your machine.
+It can be installed with homebrew:
+```
+brew install python@3.10
+```
+OPTIONAL: creating a virtual environment (highly recommended):
+```
+python3.10 -m venv venv
+```
+Activate the virtual environment
+```
+source venv/bin/activate
+```
+Install requirements:
+```
+pip install -r requirements.txt
+```
+Run the app:
+Before running the app, make sure you are in the ash directory (relative paths).
+```
+python app.py
+```

@@ -12,7 +12,7 @@ DATA_FOLDER = os.path.join(os.getcwd(), "common", "user_data")
 
 REDUCED_DIMENSIONS_FOLDER = "reduced_dimensions"
 
-numpy.set_printoptions(threshold=9999999999999)
+numpy.set_printoptions(threshold=9999999999999)  # TODO: INSPECT consider np.inf
 
 
 class PlotMaster:
@@ -24,16 +24,8 @@ class PlotMaster:
         self.order = order
         self.color_map = color_map
 
-    def plot_interactive(self, data, layout):
-        return go.Figure(data=data, layout=layout)
-
     def plot_dendrogram(self, dendrogram):
         return go.Figure(data=dendrogram.data, layout=dendrogram.layout)
-
-    def plot_heatmap(self, desired_features):
-        return go.Figure(
-            data=go.Heatmap(self.df_to_plotly(self.input_data, desired_features))
-        )
 
     def order_labels(self):
         ordered_labels = []
@@ -46,9 +38,8 @@ class PlotMaster:
         df: pd.DataFrame,
         desired_columns: list,
     ):
-        df = df.reindex(self.order)
         df = df[desired_columns].T
-        return {"z": df.values, "x": self.order_labels(), "y": df.index.tolist()}
+        return {"z": df.values, "y": df.index.tolist()}
 
     def plot_all_dimensions(self):
         features = self.input_data.columns
@@ -62,22 +53,37 @@ class PlotMaster:
         fig.update_traces(diagonal_visible=True)
         return fig
 
-    def plot_pca(self, dimensions: int = 2):
+    def plot_pca(self, color_map, dimensions: int = 2):
         filename = "pca.txt" if dimensions == 2 else "pca_3D.txt"
         pca = self.read_reduction(filename, REDUCED_DIMENSIONS_FOLDER)
         if not pca:
             pca = PCA(dimensions).fit_transform(self.input_data)
-            self.save_reduction(pca, filename, REDUCED_DIMENSIONS_FOLDER)
+            # self.save_reduction(pca, filename, REDUCED_DIMENSIONS_FOLDER)
 
         if dimensions == 2:
             fig = px.scatter(
                 pca,
                 x=0,
                 y=1,
-                color=list(self.color_map.keys()),
-                color_discrete_map=self.color_map,
-                hover_name=self.labels,
-                title="PCA",
+                title="First and Second Principal Components",
+                color=color_map,
+                color_discrete_map={c: c for c in color_map},
+            )
+            fig.update_layout(
+                {
+                    "xaxis_title": "1st Component",
+                    "yaxis_title": "2nd Component",
+                    "showlegend": False,
+                }
+            )
+            fig.update_traces(
+                hovertemplate="<br>".join(
+                    [
+                        "1st Component: %{x}",
+                        "2nd Component: %{y}",
+                    ]
+                ),
+                name="",
             )
         else:
             fig = px.scatter_3d(
@@ -85,30 +91,64 @@ class PlotMaster:
                 x=0,
                 y=1,
                 z=2,
-                color=list(self.color_map.keys()),
-                color_discrete_map=self.color_map,
-                hover_name=self.labels,
-                title="PCA_3D",
+                color=color_map,
+                color_discrete_map={c: c for c in color_map},
+                title="First Three Principal Components",
+            )
+            fig.update_layout(
+                {
+                    "showlegend": False,
+                    "scene": {
+                        "xaxis_title": "1st Component",
+                        "yaxis_title": "2nd Component",
+                        "zaxis_title": "3rd Component",
+                    },
+                }
+            )
+            fig.update_traces(
+                hovertemplate="<br>".join(
+                    [
+                        "1st Component: %{x}",
+                        "2nd Component: %{y}",
+                        "3rd Component: %{z}",
+                    ]
+                ),
+                name="",
             )
         return fig
 
-    def plot_tsne(self, dimensions: int = 2):
+    def plot_tsne(self, color_map, dimensions: int = 2):
         filename = "tsne.txt" if dimensions == 2 else "tsne_3D.txt"
         tsne = self.read_reduction(filename, REDUCED_DIMENSIONS_FOLDER)
         if not tsne:
             tsne = TSNE(
                 n_components=dimensions, random_state=0, perplexity=5
             ).fit_transform(self.input_data)
-            self.save_reduction(tsne, filename, REDUCED_DIMENSIONS_FOLDER)
+            # self.save_reduction(tsne, filename, REDUCED_DIMENSIONS_FOLDER)
         if dimensions == 2:
             fig = px.scatter(
                 tsne,
                 x=0,
                 y=1,
-                color=list(self.color_map.keys()),
-                color_discrete_map=self.color_map,
-                hover_name=self.labels,
-                title="TSNE",
+                title="t-distributed Stochastic Neighbor Embedding (t-SNE) - First Two Components",
+                color=color_map,
+                color_discrete_map={c: c for c in color_map},
+            )
+            fig.update_layout(
+                {
+                    "xaxis_title": "1st Component",
+                    "yaxis_title": "2nd Component",
+                    "showlegend": False,
+                }
+            )
+            fig.update_traces(
+                hovertemplate="<br>".join(
+                    [
+                        "1st Component: %{x}",
+                        "2nd Component: %{y}",
+                    ]
+                ),
+                name="",
             )
         else:
             fig = px.scatter_3d(
@@ -116,30 +156,64 @@ class PlotMaster:
                 x=0,
                 y=1,
                 z=2,
-                color=list(self.color_map.keys()),
-                color_discrete_map=self.color_map,
-                hover_name=self.labels,
-                title="TSNE_3D",
+                color=color_map,
+                color_discrete_map={c: c for c in color_map},
+                title="t-distributed Stochastic Neighbor Embedding (t-SNE) - First Three Components",
+            )
+            fig.update_layout(
+                {
+                    "showlegend": False,
+                    "scene": {
+                        "xaxis_title": "1st Component",
+                        "yaxis_title": "2nd Component",
+                        "zaxis_title": "3rd Component",
+                    },
+                }
+            )
+            fig.update_traces(
+                hovertemplate="<br>".join(
+                    [
+                        "1st Component: %{x}",
+                        "2nd Component: %{y}",
+                        "3rd Component: %{z}",
+                    ]
+                ),
+                name="",
             )
         return fig
 
-    def plot_umap(self, dimensions: int = 2):
+    def plot_umap(self, color_map, dimensions: int = 2):
         filename = "umap.txt" if dimensions == 2 else "umap_3D.txt"
         umap = self.read_reduction(filename, REDUCED_DIMENSIONS_FOLDER)
         if not umap:
             umap = UMAP(
                 n_components=dimensions, init="random", random_state=0
             ).fit_transform(self.input_data)
-            self.save_reduction(umap, filename, REDUCED_DIMENSIONS_FOLDER)
+            # self.save_reduction(umap, filename, REDUCED_DIMENSIONS_FOLDER)
         if dimensions == 2:
             fig = px.scatter(
                 umap,
                 x=0,
                 y=1,
-                color=list(self.color_map.keys()),
-                color_discrete_map=self.color_map,
-                hover_name=self.labels,
-                title="UMAP",
+                title="Uniform Manifold Approximation and Projection (UMAP) - First Two Components",
+                color=color_map,
+                color_discrete_map={c: c for c in color_map},
+            )
+            fig.update_layout(
+                {
+                    "xaxis_title": "1st Component",
+                    "yaxis_title": "2nd Component",
+                    "showlegend": False,
+                }
+            )
+            fig.update_traces(
+                hovertemplate="<br>".join(
+                    [
+                        "1st Component: %{x}",
+                        "2nd Component: %{y}",
+                    ]
+                ),
+                name="",
             )
         else:
             fig = px.scatter_3d(
@@ -147,25 +221,44 @@ class PlotMaster:
                 x=0,
                 y=1,
                 z=2,
-                color=list(self.color_map.keys()),
-                color_discrete_map=self.color_map,
-                hover_name=self.labels,
-                title="UMAP_3D",
+                color=color_map,
+                color_discrete_map={c: c for c in color_map},
+                title="Uniform Manifold Approximation and Projection (UMAP) - First Three Components",
+            )
+            fig.update_layout(
+                {
+                    "showlegend": False,
+                    "scene": {
+                        "xaxis_title": "1st Component",
+                        "yaxis_title": "2nd Component",
+                        "zaxis_title": "3rd Component",
+                    },
+                }
+            )
+            fig.update_traces(
+                hovertemplate="<br>".join(
+                    [
+                        "1st Component: %{x}",
+                        "2nd Component: %{y}",
+                        "3rd Component: %{z}",
+                    ]
+                ),
+                name="",
             )
         return fig
 
-    def plot_selected_features(self, desired_columns):
+    def plot_selected_features(self, desired_columns, color_mask):
         to_plot = self.input_data[desired_columns]
-        fig = px.scatter(
-            to_plot,
-            x=to_plot.columns[0],
-            y=to_plot.columns[1],
-            color=list(self.color_map.keys()),
-            color_discrete_map=self.color_map,
-            hover_name=self.labels,
-            labels={"color": "sample"},
+
+        fig = go.Figure(
+            go.Scatter(
+                x=to_plot.loc[:, to_plot.columns[0]],
+                y=to_plot.loc[:, to_plot.columns[1]],
+                mode="markers",
+                marker_color=color_mask,
+            )
         )
-        fig.update_layout(showlegend=False)
+
         return fig
 
     @staticmethod
@@ -183,14 +276,14 @@ class PlotMaster:
         try:
             with open(os.path.join(path_to_folder, subfolder, filename), "r") as file:
                 for line in file.readlines():
-                    l = list(
+                    row = list(
                         map(
                             float,
                             line.strip().replace("[", "").replace("]", "").split(),
                         )
                     )
-                    data.append(l)
-        except:
+                    data.append(row)
+        except FileNotFoundError:
             return None
         return data
 
